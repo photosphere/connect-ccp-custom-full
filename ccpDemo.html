@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/amazon-connect-streams@2.14.3/release/connect-streams.js"></script>
+    <title>呼叫中心软电话</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+
+        .softphone {
+            width: 320px;
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h2 {
+            margin: 0;
+            flex-grow: 1;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .language-selector,
+        .agent-status-selector {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .agent-status-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-ready {
+            background-color: #4CAF50;
+        }
+
+        .status-offline {
+            background-color: #f44336;
+        }
+
+        .status-break {
+            background-color: #FF9800;
+        }
+
+        .phone-display {
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            position: relative;
+        }
+
+        .status {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .caller-id {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+
+        .timer {
+            color: #888;
+            font-size: 14px;
+        }
+
+        .dialer input {
+            width: 100%;
+            padding: 10px;
+            font-size: 18px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .key {
+            background-color: #f1f1f1;
+            border: none;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .key:hover {
+            background-color: #e5e5e5;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .call-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .call-button:hover {
+            background-color: #45a049;
+        }
+
+        .decline-button {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .decline-button:hover {
+            background-color: #d32f2f;
+        }
+
+        .incoming-call {
+            display: none;
+            text-align: center;
+            padding: 15px;
+            background-color: #fafafa;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% {
+                background-color: #fafafa;
+            }
+
+            50% {
+                background-color: #ffe0e0;
+            }
+
+            100% {
+                background-color: #fafafa;
+            }
+        }
+
+        .call-controls {
+            display: none;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .control-button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .control-button:hover {
+            background-color: #1976D2;
+        }
+
+        .control-button.mute.active {
+            background-color: #FFC107;
+        }
+
+        .control-button.hold.active {
+            background-color: #FF9800;
+        }
+
+        .control-button.transfer {
+            background-color: #9C27B0;
+        }
+
+        .control-button.hangup {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container-div" style="display: none;"></div>
+    <div class="softphone">
+        <div class="header">
+            <h2 id="title">呼叫中心软电话</h2>
+            <div class="header-controls">
+                <select class="language-selector" id="language-selector">
+                    <option value="zh">中文</option>
+                    <option value="th">ภาษาไทย</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="agent-status-indicator">
+            <div class="status-dot status-ready" id="status-dot"></div>
+            <span id="current-agent-status">就绪</span>
+            <select class="agent-status-selector" id="agent-status-selector" style="margin-left: auto;">
+                <option value="Available">就绪</option>
+                <option value="Offline">下线</option>
+                <option value="Lunch Time">就餐</option>
+            </select>
+        </div>
+
+        <div class="phone-display">
+            <div class="status" id="status">准备就绪</div>
+            <div class="caller-id" id="display"></div>
+            <div class="timer" id="timer"></div>
+        </div>
+
+        <div class="incoming-call" id="incoming-call">
+            <h3 id="incoming-title">来电</h3>
+            <p id="incoming-number">电话号码...</p>
+            <div class="action-buttons">
+                <button class="call-button" id="answer-call">接起</button>
+                <button class="decline-button" id="decline-call">拒绝</button>
+            </div>
+        </div>
+
+        <div class="dialer">
+            <input type="tel" id="phone-number" placeholder="输入电话号码">
+
+            <div class="keypad">
+                <button class="key" onclick="appendToNumber('1')">1</button>
+                <button class="key" onclick="appendToNumber('2')">2</button>
+                <button class="key" onclick="appendToNumber('3')">3</button>
+                <button class="key" onclick="appendToNumber('4')">4</button>
+                <button class="key" onclick="appendToNumber('5')">5</button>
+                <button class="key" onclick="appendToNumber('6')">6</button>
+                <button class="key" onclick="appendToNumber('7')">7</button>
+                <button class="key" onclick="appendToNumber('8')">8</button>
+                <button class="key" onclick="appendToNumber('9')">9</button>
+                <button class="key" onclick="appendToNumber('*')">*</button>
+                <button class="key" onclick="appendToNumber('0')">0</button>
+                <button class="key" onclick="appendToNumber('#')">#</button>
+            </div>
+
+            <div class="action-buttons">
+                <button class="call-button" id="make-call">呼出</button>
+                <button class="decline-button" id="clear-number">清除</button>
+            </div>
+        </div>
+
+        <div class="call-controls" id="call-controls">
+            <button class="control-button mute" id="mute-button">静音</button>
+            <button class="control-button hold" id="hold-button">待机</button>
+            <button class="control-button transfer" id="transfer-button">转接</button>
+            <button class="control-button hangup" id="hangup-button">挂断</button>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let callActive = false;
+        let callTimer;
+        let callSeconds = 0;
+        let isMuted = false;
+        let isOnHold = false;
+        let currentLanguage = 'zh';
+        let currentAgentStatus = 'Available';
+
+        let instanceURL = "https://connect-us-1.my.connect.aws/ccp-v2/";
+        let instanceRegion = "us-east-1";
+
+        // 语言包
+        const translations = {
+            zh: {
+                title: "Amazon Connect",
+                ready: "准备就绪",
+                incoming: "来电",
+                phoneNumber: "输入电话号码",
+                answer: "接起",
+                decline: "拒绝",
+                callOut: "呼出",
+                clear: "清除",
+                mute: "静音",
+                unmute: "取消静音",
+                hold: "待机",
+                resume: "恢复",
+                transfer: "转接",
+                hangup: "挂断",
+                inCall: "通话中",
+                onHold: "通话保持中",
+                callEnded: "通话结束",
+                declined: "已拒绝来电",
+                transferPrompt: "请输入要转接的电话号码:",
+                transferring: "正在转接至 {0}...",
+                agentStatus: {
+                    Available: "就绪",
+                    Offline: "下线",
+                    LunchTime: "就餐"
+                },
+                unavailable: "当前状态无法接听电话"
+            },
+            th: {
+                title: "Amazon Connect",
+                ready: "พร้อมใช้งาน",
+                incoming: "สายเข้า",
+                phoneNumber: "ป้อนหมายเลขโทรศัพท์",
+                answer: "รับสาย",
+                decline: "ปฏิเสธ",
+                callOut: "โทรออก",
+                clear: "ล้าง",
+                mute: "ปิดเสียง",
+                unmute: "เปิดเสียง",
+                hold: "พักสาย",
+                resume: "กลับมา",
+                transfer: "โอนสาย",
+                hangup: "วางสาย",
+                inCall: "กำลังใช้สาย",
+                onHold: "สายถูกพักไว้",
+                callEnded: "วางสายแล้ว",
+                declined: "ปฏิเสธสายแล้ว",
+                transferPrompt: "กรุณาป้อนหมายเลขโทรศัพท์ที่ต้องการโอนสาย:",
+                transferring: "กำลังโอนสายไปที่ {0}...",
+                agentStatus: {
+                    Available: "พร้อมใช้งาน",
+                    Offline: "ออฟไลน์",
+                    LunchTime: "พักรับประทานอาหาร"
+                },
+                unavailable: "ไม่สามารถรับสายได้ในสถานะปัจจุบัน"
+            }
+        };
+
+        // DOM 元素
+        const phoneNumberInput = document.getElementById('phone-number');
+        const display = document.getElementById('display');
+        const statusDisplay = document.getElementById('status');
+        const timerDisplay = document.getElementById('timer');
+        const incomingCallPanel = document.getElementById('incoming-call');
+        const incomingNumber = document.getElementById('incoming-number');
+        const callControls = document.getElementById('call-controls');
+        const languageSelector = document.getElementById('language-selector');
+        const agentStatusSelector = document.getElementById('agent-status-selector');
+        const currentAgentStatusDisplay = document.getElementById('current-agent-status');
+        const statusDot = document.getElementById('status-dot');
+
+        // 添加数字到输入框
+        function appendToNumber(digit) {
+            phoneNumberInput.value += digit;
+        }
+
+        // 清除输入框
+        document.getElementById('clear-number').addEventListener('click', function () {
+            phoneNumberInput.value = '';
+            clearCall();
+        });
+
+        // 拨打电话
+        document.getElementById('make-call').addEventListener('click', function () {
+            const number = phoneNumberInput.value.trim();
+            if (number) {
+                if (currentAgentStatus === 'Available') {
+                    startCall(number, translations[currentLanguage].inCall);
+                    placeOutboundCall(number);
+                } else {
+                    alert(translations[currentLanguage].unavailable);
+                }
+            }
+        });
+
+        // 来电处理
+        function simulateIncomingCall(number) {
+            // 只有在未通话状态下且座席就绪时才能接收来电
+            if (!callActive && currentAgentStatus === 'Available') {
+                incomingNumber.textContent = number;
+                incomingCallPanel.style.display = 'block';
+
+                // 来电铃声效果可以在这里添加
+                statusDisplay.textContent = translations[currentLanguage].incoming + '...';
+            }
+        }
+
+        // 接听电话
+        document.getElementById('answer-call').addEventListener('click', function () {
+            const number = incomingNumber.textContent;
+            incomingCallPanel.style.display = 'none';
+            startCall(number, translations[currentLanguage].inCall);
+            acceptContact();
+        });
+
+        // 拒绝电话
+        document.getElementById('decline-call').addEventListener('click', function () {
+            incomingCallPanel.style.display = 'none';
+            statusDisplay.textContent = translations[currentLanguage].declined;
+            setTimeout(() => {
+                statusDisplay.textContent = translations[currentLanguage].ready;
+            }, 2000);
+
+        });
+
+        // 开始通话
+        function startCall(number, status) {
+            callActive = true;
+            display.textContent = number;
+            statusDisplay.textContent = status;
+            callControls.style.display = 'grid';
+
+            // 重置并开始计时器
+            callSeconds = 0;
+            updateTimer();
+            callTimer = setInterval(updateTimer, 1000);
+        }
+
+        // 更新通话时间
+        function updateTimer() {
+            const minutes = Math.floor(callSeconds / 60);
+            const seconds = callSeconds % 60;
+            timerDisplay.textContent = `\${minutes.toString().padStart(2, '0')}:\${seconds.toString().padStart(2, '0')}`;
+            callSeconds++;
+        }
+
+        // 挂断通话
+        document.getElementById('hangup-button').addEventListener('click', function () {
+            endCall();
+            huanUpCall();
+        });
+
+        // 结束通话
+        function endCall() {
+            callActive = false;
+            clearInterval(callTimer);
+            display.textContent = '';
+            statusDisplay.textContent = translations[currentLanguage].callEnded;
+            timerDisplay.textContent = '';
+            callControls.style.display = 'none';
+
+            // 重置按钮状态
+            document.getElementById('mute-button').classList.remove('active');
+            document.getElementById('hold-button').classList.remove('active');
+            document.getElementById('mute-button').textContent = translations[currentLanguage].mute;
+            document.getElementById('hold-button').textContent = translations[currentLanguage].hold;
+            isMuted = false;
+            isOnHold = false;
+
+            setTimeout(() => {
+                statusDisplay.textContent = translations[currentLanguage].ready;
+            }, 2000);
+        }
+
+        // 静音功能
+        document.getElementById('mute-button').addEventListener('click', function () {
+            isMuted = !isMuted;
+            this.classList.toggle('active');
+            if (isMuted) {
+                this.textContent = translations[currentLanguage].unmute;
+            } else {
+                this.textContent = translations[currentLanguage].mute;
+            }
+        });
+
+        // 通话保持功能
+        document.getElementById('hold-button').addEventListener('click', function () {
+            isOnHold = !isOnHold;
+            this.classList.toggle('active');
+            if (isOnHold) {
+                this.textContent = translations[currentLanguage].resume;
+                statusDisplay.textContent = translations[currentLanguage].onHold;
+            } else {
+                this.textContent = translations[currentLanguage].hold;
+                statusDisplay.textContent = translations[currentLanguage].inCall;
+            }
+        });
+
+        // 转接功能
+        document.getElementById('transfer-button').addEventListener('click', function () {
+            const transferNumber = prompt(translations[currentLanguage].transferPrompt);
+            if (transferNumber) {
+                statusDisplay.textContent = translations[currentLanguage].transferring.replace('{0}', transferNumber);
+
+                // 模拟转接过程
+                setTimeout(() => {
+                    endCall();
+                }, 2000);
+            }
+        });
+
+        // 语言切换
+        languageSelector.addEventListener('change', function () {
+            currentLanguage = this.value;
+            updateUILanguage();
+            updateAgentStatusOptions();
+            updateAgentStatusDisplay();
+        });
+
+        // 座席状态切换
+        agentStatusSelector.addEventListener('change', function () {
+            currentAgentStatus = this.value;
+            updateAgentStatusDisplay();
+
+            // 如果不是就绪状态，无法接听电话
+            if (currentAgentStatus !== 'Available' && incomingCallPanel.style.display === 'block') {
+                incomingCallPanel.style.display = 'none';
+                statusDisplay.textContent = translations[currentLanguage].ready;
+            }
+
+            // 如果从就绪变为其他状态并且正在通话，则结束通话
+            if (currentAgentStatus !== 'Available' && callActive) {
+                endCall();
+            }
+        });
+
+        // 更新座席状态显示
+        function updateAgentStatusDisplay() {
+            if (currentAgentStatus === 'MissedCallAgent') {
+                statusDisplay.textContent = 'MISSED';
+            }
+            else {
+                // 更新当前座席状态文本
+                currentAgentStatusDisplay.textContent = translations[currentLanguage].agentStatus[currentAgentStatus];
+
+                // 更新状态指示点颜色
+                statusDot.className = 'status-dot';
+                if (currentAgentStatus === 'Available') {
+                    statusDot.classList.add('status-ready');
+                } else if (currentAgentStatus === 'Offline') {
+                    statusDot.classList.add('status-offline');
+                } else if (currentAgentStatus === 'Lunch Time') {
+                    statusDot.classList.add('status-break');
+                }
+
+                SetAgentState(currentAgentStatus);
+            }
+        }
+
+        // 更新座席状态选项
+        function updateAgentStatusOptions() {
+            const statusOptions = agentStatusSelector.options;
+            statusOptions[0].text = translations[currentLanguage].agentStatus.Available;
+            statusOptions[1].text = translations[currentLanguage].agentStatus.Offline;
+            statusOptions[2].text = translations[currentLanguage].agentStatus.LunchTime;
+        }
+
+        // 更新界面语言
+        function updateUILanguage() {
+            // 更新标题和状态文本
+            document.getElementById('title').textContent = translations[currentLanguage].title;
+            if (!callActive) {
+                statusDisplay.textContent = translations[currentLanguage].ready;
+            } else if (isOnHold) {
+                statusDisplay.textContent = translations[currentLanguage].onHold;
+            } else {
+                statusDisplay.textContent = translations[currentLanguage].inCall;
+            }
+
+            // 更新按钮文本
+            document.getElementById('incoming-title').textContent = translations[currentLanguage].incoming;
+            document.getElementById('answer-call').textContent = translations[currentLanguage].answer;
+            document.getElementById('decline-call').textContent = translations[currentLanguage].decline;
+            document.getElementById('make-call').textContent = translations[currentLanguage].callOut;
+            document.getElementById('clear-number').textContent = translations[currentLanguage].clear;
+
+            // 更新控制按钮
+            document.getElementById('mute-button').textContent = isMuted ? translations[currentLanguage].unmute : translations[currentLanguage].mute;
+            document.getElementById('hold-button').textContent = isOnHold ? translations[currentLanguage].resume : translations[currentLanguage].hold;
+            document.getElementById('transfer-button').textContent = translations[currentLanguage].transfer;
+            document.getElementById('hangup-button').textContent = translations[currentLanguage].hangup;
+
+            // 更新输入框占位符
+            document.getElementById('phone-number').placeholder = translations[currentLanguage].phoneNumber;
+        }
+
+        // 初始化 streams api
+        function init() {
+
+            window.localStorage.removeItem('connectPopupManager::connect::loginPopup');
+
+            initCore(instanceURL, instanceRegion);
+
+            connect.contact(subscribeToContactEvents);
+
+            connect.agent(subscribeToAgentEvents);
+        }
+
+        function initCore(instanceURL, instanceRegion) {
+            var containerDiv = document.getElementById("container-div");
+            try {
+                connect.core.initCCP(containerDiv, {
+                    ccpUrl: instanceURL,            // REQUIRED
+                    loginPopup: true,               // optional, defaults to `true`
+                    loginPopupAutoClose: true,      // optional, defaults to `false`
+                    loginOptions: {                 // optional, if provided opens login in new window
+                        autoClose: true,              // optional, defaults to `false`
+                        height: 600,                  // optional, defaults to 578
+                        width: 400,                   // optional, defaults to 433
+                        top: 0,                       // optional, defaults to 0
+                        left: 0                       // optional, defaults to 0
+                    },
+                    region: instanceRegion,         // REQUIRED for `CHAT`, optional otherwise
+                    softphone: {                    // optional, defaults below apply if not provided
+                        allowFramedSoftphone: true,   // optional, defaults to false
+                        disableRingtone: false,       // optional, defaults to false
+                        // ringtoneUrl: "./ringtone.mp3" // optional, defaults to CCP’s default ringtone if a falsy value is set
+                    },
+                    pageOptions: { //optional
+                        enableAudioDeviceSettings: true, //optional, defaults to 'false'
+                        enablePhoneTypeSettings: true //optional, defaults to 'true'
+                    },
+                    ccpAckTimeout: 3000, //optional, defaults to 3000 (ms)
+                    ccpSynTimeout: 1000, //optional, defaults to 1000 (ms)
+                    ccpLoadTimeout: 5000 //optional, defaults to 5000 (ms)
+                });
+            }
+            catch (err) {
+                console.error(err);
+            }
+        }
+
+        function subscribeToContactEvents(c) {
+            c.onConnecting(function (c) {
+                const number = getCustomerPhoneNumber(c);
+                simulateIncomingCall(number);
+            });
+
+            c.onConnected(function (c) {
+
+            });
+
+            c.onACW(function (c) {
+
+            });
+
+            c.onEnded(function (c) {
+
+            })
+
+        }
+
+        function getCustomerPhoneNumber(c) {
+            var c1 = c.getConnections()[1];
+            var num = c1.getAddress()['phoneNumber'];
+            return num;
+        }
+
+        function subscribeToAgentEvents(agent) {
+
+            var state = loadAgentState();
+            currentAgentStatus = state;
+            updateAgentStatusDisplay();
+            updateAgentStatusSelectedOption();
+
+            loadQuickConnects();
+        }
+
+        function loadAgentStates() {
+            const agent = new lily.Agent();
+            const curState = agent.getState().name;
+            const states = agent.getAgentStates();
+            states.sort((a, b) => a.name.localeCompare(b.name));
+
+            return states;
+        }
+
+        function loadAgentState() {
+            const agent = new lily.Agent();
+            const state = agent.getState().name;
+
+            return state;
+        }
+
+        function loadQuickConnects() {
+            var agent = new lily.Agent();
+            var queuesARNs = agent.getAllQueueARNs();
+            agent.getEndpoints(queuesARNs, {
+                success: function (data) {
+                    var endpoints = data.endpoints;
+                },
+                failure: function (data) {
+                    //alert("Supervisor is unavailable...");
+                }
+            });
+        }
+
+        function acceptContact() {
+            var agent = new lily.Agent();
+            var contact = agent.getContacts(lily.ContactType.VOICE)[0];
+            if (contact) {
+                contact.accept({
+                    success: function () {
+                    },
+                    failure: function (err) {
+
+                    }
+                });
+            }
+        }
+
+        function placeOutboundCall(phone) {
+            var agent = new lily.Agent();
+            agent.connect(connect.Endpoint.byPhoneNumber(phone), {});
+        }
+
+        function huanUpCall() {
+            var agent = new lily.Agent();
+            var contact = agent.getContacts(lily.ContactType.VOICE)[0];
+            var initialConnection = contact.getInitialConnection();
+            if (initialConnection) {
+                initialConnection.destroy({
+                    success: function () {
+                        logOutput('onDestroy event : Contact destroyed');
+                    },
+                    failure: function (err) {
+                        logOutput(err);
+                    }
+                });
+            }
+        }
+
+        function SetAgentState(stateName) {
+            var agent = new lily.Agent();
+            if (agent) {
+                var states = loadAgentStates();
+                if (states.length > 0) {
+                    const state = states.filter(s => s.name === stateName)[0];
+                    agent.setState(state, {
+                        success: function () {
+                        },
+                        failure: function () {
+                        }
+                    });
+                }
+            }
+        }
+
+        function updateAgentStatusSelectedOption() {
+            for (let i = 0; i < agentStatusSelector.options.length; i++) {
+                if (agentStatusSelector.options[i].value === currentAgentStatus) {
+                    agentStatusSelector.selectedIndex = i;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function clearCall() {
+            var agent = new lily.Agent();
+            var contact = agent.getContacts(lily.ContactType.VOICE)[0];
+            contact.clear({
+                success: function () {
+                    statusDisplay.textContent = translations[currentLanguage].ready;
+                },
+                failure: function (err) {
+
+                }
+            });
+        }
+
+        // 初始化
+        updateUILanguage();
+        updateAgentStatusOptions();
+
+        init();
+    </script>
+</body>
+
+</html>
