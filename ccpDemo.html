@@ -56,6 +56,29 @@
             cursor: pointer;
         }
 
+        .login-button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+
+        .login-button:hover {
+            background-color: #1976D2;
+        }
+
+        .user-info {
+            display: none;
+            font-size: 14px;
+            color: #333;
+            margin-left: 10px;
+        }
+
         .agent-status-indicator {
             display: flex;
             align-items: center;
@@ -249,13 +272,17 @@
         <div class="header">
             <h2 id="title">呼叫中心软电话</h2>
             <div class="header-controls">
+
                 <select class="language-selector" id="language-selector">
                     <option value="zh">中文</option>
                     <option value="th">ภาษาไทย</option>
                 </select>
             </div>
         </div>
-
+        <div class="phone-display">
+            <button id="login-button" class="login-button">登录</button>
+            <span id="user-info" class="user-info"></span>
+        </div>
         <div class="agent-status-indicator">
             <div class="status-dot status-ready" id="status-dot"></div>
             <span id="current-agent-status">就绪</span>
@@ -322,6 +349,8 @@
         let isOnHold = false;
         let currentLanguage = 'zh';
         let currentAgentStatus = 'Available';
+        let isLoggedIn = false;
+        let username = '';
 
         let instanceURL = "https://connect-us-1.my.connect.aws/ccp-v2/";
         let instanceRegion = "us-east-1";
@@ -354,7 +383,10 @@
                     Offline: "下线",
                     LunchTime: "就餐"
                 },
-                unavailable: "当前状态无法接听电话"
+                unavailable: "当前状态无法接听电话",
+                login: "登录",
+                logout: "退出",
+                welcome: "欢迎，"
             },
             th: {
                 title: "Amazon Connect",
@@ -382,7 +414,10 @@
                     Offline: "ออฟไลน์",
                     LunchTime: "พักรับประทานอาหาร"
                 },
-                unavailable: "ไม่สามารถรับสายได้ในสถานะปัจจุบัน"
+                unavailable: "ไม่สามารถรับสายได้ในสถานะปัจจุบัน",
+                login: "เข้าสู่ระบบ",
+                logout: "ออกจากระบบ",
+                welcome: "ยินดีต้อนรับ, "
             }
         };
 
@@ -398,6 +433,32 @@
         const agentStatusSelector = document.getElementById('agent-status-selector');
         const currentAgentStatusDisplay = document.getElementById('current-agent-status');
         const statusDot = document.getElementById('status-dot');
+        const loginButton = document.getElementById('login-button');
+        const userInfo = document.getElementById('user-info');
+
+        // 登录按钮点击事件
+        loginButton.addEventListener('click', function () {
+            if (!isLoggedIn) {
+                init();
+            } else {
+                // 模拟登出操作
+                isLoggedIn = false;
+                username = '';
+                userInfo.textContent = '';
+                userInfo.style.display = 'none';
+                loginButton.textContent = translations[currentLanguage].login;
+
+                logOut();
+            }
+        });
+
+        function displayAgent(agentName) {
+            username = agentName;
+            isLoggedIn = true;
+            userInfo.textContent = translations[currentLanguage].welcome + username;
+            userInfo.style.display = 'inline';
+            loginButton.textContent = translations[currentLanguage].logout;
+        }
 
         // 添加数字到输入框
         function appendToNumber(digit) {
@@ -545,7 +606,17 @@
             updateUILanguage();
             updateAgentStatusOptions();
             updateAgentStatusDisplay();
+            updateLoginUI();
         });
+
+        function updateLoginUI() {
+            if (isLoggedIn) {
+                loginButton.textContent = translations[currentLanguage].logout;
+                userInfo.textContent = translations[currentLanguage].welcome + username;
+            } else {
+                loginButton.textContent = translations[currentLanguage].login;
+            }
+        }
 
         // 座席状态切换
         agentStatusSelector.addEventListener('change', function () {
@@ -622,6 +693,12 @@
 
             // 更新输入框占位符
             document.getElementById('phone-number').placeholder = translations[currentLanguage].phoneNumber;
+
+            // 更新登录按钮文本
+            loginButton.textContent = isLoggedIn ? translations[currentLanguage].logout : translations[currentLanguage].login;
+            if (isLoggedIn) {
+                userInfo.textContent = translations[currentLanguage].welcome + username;
+            }
         }
 
         // 初始化 streams api
@@ -654,7 +731,7 @@
                     softphone: {                    // optional, defaults below apply if not provided
                         allowFramedSoftphone: true,   // optional, defaults to false
                         disableRingtone: false,       // optional, defaults to false
-                        // ringtoneUrl: "./ringtone.mp3" // optional, defaults to CCP’s default ringtone if a falsy value is set
+                        // ringtoneUrl: "./ringtone.mp3" // optional, defaults to CCP's default ringtone if a falsy value is set
                     },
                     pageOptions: { //optional
                         enableAudioDeviceSettings: true, //optional, defaults to 'false'
@@ -704,6 +781,8 @@
             updateAgentStatusSelectedOption();
 
             loadQuickConnects();
+
+            displayAgent(agent.getName());
         }
 
         function loadAgentStates() {
@@ -799,21 +878,35 @@
         function clearCall() {
             var agent = new lily.Agent();
             var contact = agent.getContacts(lily.ContactType.VOICE)[0];
-            contact.clear({
-                success: function () {
-                    statusDisplay.textContent = translations[currentLanguage].ready;
-                },
-                failure: function (err) {
+            if (contact) {
+                contact.clear({
+                    success: function () {
+                        statusDisplay.textContent = translations[currentLanguage].ready;
+                    },
+                    failure: function (err) {
 
-                }
-            });
+                    }
+                });
+            }
+        }
+
+        function logOut() {
+            fetch("https://connect-us-1.my.connect.aws/connect/logout", { credentials: 'include', mode: 'no-cors' })
+                .then(() => {
+                    const eventBus = connect.core.getEventBus();
+                    eventBus.trigger(connect.EventType.TERMINATE);
+
+                    clearChatWindow();
+                }).then(() => {
+                    window.location.reload();
+                });
         }
 
         // 初始化
         updateUILanguage();
         updateAgentStatusOptions();
 
-        init();
+
     </script>
 </body>
 
