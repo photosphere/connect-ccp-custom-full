@@ -531,7 +531,7 @@
         function updateTimer() {
             const minutes = Math.floor(callSeconds / 60);
             const seconds = callSeconds % 60;
-            timerDisplay.textContent = `\${minutes.toString().padStart(2, '0')}:\${seconds.toString().padStart(2, '0')}`;
+            timerDisplay.textContent = minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
             callSeconds++;
         }
 
@@ -581,9 +581,14 @@
             if (isOnHold) {
                 this.textContent = translations[currentLanguage].resume;
                 statusDisplay.textContent = translations[currentLanguage].onHold;
+
+                resumeContact();
+
             } else {
                 this.textContent = translations[currentLanguage].hold;
                 statusDisplay.textContent = translations[currentLanguage].inCall;
+
+                holdContact();
             }
         });
 
@@ -902,11 +907,47 @@
                 });
         }
 
+        function holdContact() {
+            var agent = new lily.Agent();
+            var contact = agent.getContacts(lily.ContactType.VOICE)[0];
+            if (contact) {
+                var initialConnection = contact.getInitialConnection();
+                if (initialConnection) {
+                    initialConnection.hold({
+                        success: function () {
+
+                        },
+                        failure: function (err) {
+
+                        }
+                    });
+                }
+            }
+        }
+
+        function resumeContact() {
+            var agent = new lily.Agent();
+            var contact = agent.getContacts(lily.ContactType.VOICE)[0];
+            if (contact) {
+                var initialConnection = contact.getInitialConnection();
+                if (initialConnection) {
+                    initialConnection.resume({
+                        success: function () {
+
+                        },
+                        failure: function (err) {
+
+                        }
+                    });
+                }
+            }
+        }
+
         // 初始化
         updateUILanguage();
         updateAgentStatusOptions();
 
-
+        init();
     </script>
 </body>
 
